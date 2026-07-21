@@ -1,1 +1,6 @@
 .worktrees/
+bin/
+obj/
+src/DiaryApp/diary.db
+src/DiaryApp/wwwroot/uploads/*
+!src/DiaryApp/wwwroot/uploads/.gitkeep
