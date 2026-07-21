@@ -1,0 +1,102 @@
+@page "/new"
+@using System.ComponentModel.DataAnnotations
+@inject DiaryEntryService EntryService
+@inject ImageStorageService ImageService
+@inject NavigationManager Nav
+
+<PageTitle>새 일기</PageTitle>
+
+<h1>새 일기 작성</h1>
+
+<EditForm Model="model" OnValidSubmit="HandleSubmit">
+    <DataAnnotationsValidator />
+
+    <div>
+        <label>날짜</label>
+        <InputDate @bind-Value="model.Date" />
+    </div>
+
+    <div>
+        <label>본문</label>
+        <InputTextArea @bind-Value="model.Content" />
+        <ValidationMessage For="() => model.Content" />
+    </div>
+
+    <div>
+        <label>태그 (쉼표로 구분)</label>
+        <InputText @bind-Value="model.TagsRaw" />
+    </div>
+
+    <div>
+        <label>기분</label>
+        <InputSelect @bind-Value="model.Mood">
+            <option value="">선택 안 함</option>
+            <option value="1">😞 1</option>
+            <option value="2">🙁 2</option>
+            <option value="3">😐 3</option>
+            <option value="4">🙂 4</option>
+            <option value="5">😄 5</option>
+        </InputSelect>
+    </div>
+
+    <div>
+        <label>이미지 첨부</label>
+        <InputFile OnChange="HandleFileSelection" multiple />
+    </div>
+
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <p class="error">@errorMessage</p>
+    }
+
+    <button type="submit">저장</button>
+</EditForm>
+
+@code {
+    private NewEntryModel model = new() { Date = DateTime.Today };
+    private List<IBrowserFile> selectedFiles = new();
+    private string? errorMessage;
+
+    private void HandleFileSelection(InputFileChangeEventArgs e)
+    {
+        selectedFiles = e.GetMultipleFiles(maximumFileCount: 10).ToList();
+    }
+
+    private async Task HandleSubmit()
+    {
+        errorMessage = null;
+        try
+        {
+            var tagNames = model.TagsRaw
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .ToList();
+
+            var entry = await EntryService.CreateAsync(model.Date, model.Content, model.Mood, tagNames);
+
+            foreach (var file in selectedFiles)
+            {
+                using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024);
+                var relativePath = await ImageService.SaveAsync(stream, file.Name, file.Size);
+                await EntryService.AddImageAsync(entry.Id, relativePath);
+            }
+
+            Nav.NavigateTo("/timeline");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+    }
+
+    private class NewEntryModel
+    {
+        public DateTime Date { get; set; }
+
+        [Required(ErrorMessage = "본문을 입력해주세요.")]
+        public string Content { get; set; } = string.Empty;
+
+        public string TagsRaw { get; set; } = string.Empty;
+
+        public int? Mood { get; set; }
+    }
+}
