@@ -1,0 +1,83 @@
+@page "/timeline"
+@inject DiaryEntryService EntryService
+@inject SearchService SearchService
+
+<PageTitle>목록·검색</PageTitle>
+
+<h1>일기 목록</h1>
+
+<div>
+    <input type="text" placeholder="검색어" @bind="keyword" @bind:event="oninput" @onkeyup="RefreshResults" />
+</div>
+
+<div>
+    @foreach (var tag in allTags)
+    {
+        <label>
+            <input type="checkbox" checked="@selectedTags.Contains(tag)"
+                   @onchange="@(e => ToggleTag(tag, (bool)e.Value!))" />
+            @tag
+        </label>
+    }
+</div>
+
+@if (entries is null)
+{
+    <p>불러오는 중...</p>
+}
+else if (entries.Count == 0)
+{
+    <p>표시할 일기가 없어요.</p>
+}
+else
+{
+    @foreach (var entry in entries)
+    {
+        <article>
+            <p>@entry.Date.ToString("yyyy-MM-dd")</p>
+            <p>@entry.Content</p>
+            @if (entry.Tags.Count > 0)
+            {
+                <p>@string.Join(", ", entry.Tags.Select(t => t.Name))</p>
+            }
+            @if (entry.Images.Count > 0)
+            {
+                <div>
+                    @foreach (var image in entry.Images)
+                    {
+                        <img src="@image.FilePath" alt="첨부 이미지" width="120" />
+                    }
+                </div>
+            }
+        </article>
+    }
+}
+
+@code {
+    private List<DiaryEntry>? entries;
+    private List<string> allTags = new();
+    private HashSet<string> selectedTags = new();
+    private string keyword = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        allTags = await SearchService.GetAllTagNamesAsync();
+        entries = await EntryService.GetAllDescendingAsync();
+    }
+
+    private async Task ToggleTag(string tag, bool isChecked)
+    {
+        if (isChecked)
+            selectedTags.Add(tag);
+        else
+            selectedTags.Remove(tag);
+        await RefreshResults();
+    }
+
+    private async Task RefreshResults()
+    {
+        var tags = selectedTags.Count > 0 ? selectedTags.ToList() : null;
+        var keywordFilter = string.IsNullOrWhiteSpace(keyword) ? null : keyword;
+        entries = await SearchService.SearchAsync(keywordFilter, tags);
+    }
+}
