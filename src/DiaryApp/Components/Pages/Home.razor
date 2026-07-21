@@ -1,7 +1,44 @@
-﻿@page "/"
+@page "/"
+@inject RetrospectiveService RetroService
 
-<PageTitle>Home</PageTitle>
+<PageTitle>회고</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>회고</h1>
 
-Welcome to your new app.
+@if (tiers is null)
+{
+    <p>불러오는 중...</p>
+}
+else if (tiers.Count == 0)
+{
+    <p>오늘 기준으로 회고할 기록이 아직 없어요.</p>
+}
+else
+{
+    @foreach (var tier in tiers)
+    {
+        <section>
+            <h2>@tier.Label</h2>
+            @foreach (var entry in tier.Entries)
+            {
+                <article>
+                    <p>@entry.Date.ToString("yyyy-MM-dd")</p>
+                    <p>@entry.Content</p>
+                    @if (entry.Tags.Count > 0)
+                    {
+                        <p>@string.Join(", ", entry.Tags.Select(t => t.Name))</p>
+                    }
+                </article>
+            }
+        </section>
+    }
+}
+
+@code {
+    private List<RetrospectiveTier>? tiers;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tiers = await RetroService.GetRetrospectiveAsync(DateTime.Today);
+    }
+}
